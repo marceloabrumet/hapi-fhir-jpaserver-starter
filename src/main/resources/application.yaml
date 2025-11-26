@@ -5,7 +5,7 @@ server:
   # Uncomment to serve FHIR under a non-default context path (e.g., /example/path/fhir)
   # servlet:
   #   context-path: /example/path
-  port: 8082
+  port: 8083
   tomcat:
     # allow | as a separator in URLs
     relaxed-query-chars: '|,{,},[,],^'
@@ -114,7 +114,7 @@ spring:
 
         # --- Optional Hibernate DDL & tuning (commented out from source) ---
         hbm2ddl:
-          auto: create
+          auto: update
         jdbc:
           batch_size: 20
         cache:
@@ -163,7 +163,7 @@ hapi:
     # B. Implementation Guides (IG) & Package Install
     # -------------------------------------------------------------------------------
     # ig_runtime_upload_enabled: false
-    # validate_resource_status_for_package_upload: false   # default true
+    validate_resource_status_for_package_upload: false   # default true
     install_transitive_ig_dependencies: true
     implementationguides:
       be-core:
@@ -176,6 +176,12 @@ hapi:
         packageUrl: https://ehealth.fgov.be/standards/fhir/vaccination/package.tgz
         name: hl7.fhir.be.vaccination
         version: 1.1.1
+        reloadExisting: true
+        installMode: STORE_AND_INSTALL
+      be-allergy:
+        packageUrl: https://ehealth.fgov.be/standards/fhir/allergy/package.tgz
+        name: hl7.fhir.be.allergy
+        version: 1.2.0
         reloadExisting: true
         installMode: STORE_AND_INSTALL
     #   swiss:
@@ -446,4 +452,4 @@ hapi:
     # -------------------------------------------------------------------------------
     # R. LastN (analytics)
     # -------------------------------------------------------------------------------
-    # lastn_enabled: true
+    # lastn_enabled: tru
