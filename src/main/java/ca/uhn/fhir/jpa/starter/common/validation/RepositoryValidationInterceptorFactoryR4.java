@@ -72,11 +72,44 @@ public class RepositoryValidationInterceptorFactoryR4 implements IRepositoryVali
 
 		// Customize the ruleBuilder here to have the rules you want! We will give a simple example
 		// of enabling validation for all Patient resources
+		// repositoryValidatingRuleBuilder
+		//		.forResourcesOfType("Patient")
+		//		.requireAtLeastProfile("http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient")
+		//		.and()
+		//		.requireValidationToDeclaredProfiles();
+
+		// Added belgian core profiles validation
 		repositoryValidatingRuleBuilder
-				.forResourcesOfType("Patient")
-				.requireAtLeastProfile("http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient")
-				.and()
-				.requireValidationToDeclaredProfiles();
+			.forResourcesOfType("Patient")
+			.requireAtLeastProfile("https://www.ehealth.fgov.be/standards/fhir/core/StructureDefinition/be-patient")
+			.and()
+			.requireValidationToDeclaredProfiles();
+
+		repositoryValidatingRuleBuilder
+			.forResourcesOfType("Practitioner")
+			.requireAtLeastProfile("https://www.ehealth.fgov.be/standards/fhir/core/StructureDefinition/be-practitioner")
+			.and()
+			.requireValidationToDeclaredProfiles();
+
+		repositoryValidatingRuleBuilder
+			.forResourcesOfType("PractitionerRole")
+			.requireAtLeastProfile("https://www.ehealth.fgov.be/standards/fhir/core/StructureDefinition/be-practitionerrole")
+			.and()
+			.requireValidationToDeclaredProfiles();
+
+		// Added belgian allergy profile validation
+		// repositoryValidatingRuleBuilder
+		//	.forResourcesOfType("AllergyIntolerance")
+		//	.requireAtLeastProfile("https://www.ehealth.fgov.be/standards/fhir/allergy/StructureDefinition/be-allergyintolerance")
+		//	.and()
+		//	.requireValidationToDeclaredProfiles();
+
+		// Added belgian vaccination profile validation
+		repositoryValidatingRuleBuilder
+			.forResourcesOfType("Immunization")
+			.requireAtLeastProfile("https://www.ehealth.fgov.be/standards/fhir/vaccination/StructureDefinition/be-vaccination")
+			.and()
+			.requireValidationToDeclaredProfiles();
 
 		// Do not customize below this line
 		List<IRepositoryValidatingRule> rules = repositoryValidatingRuleBuilder.build();
