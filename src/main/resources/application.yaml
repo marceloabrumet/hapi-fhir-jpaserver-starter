@@ -5,7 +5,7 @@ server:
   # Uncomment to serve FHIR under a non-default context path (e.g., /example/path/fhir)
   # servlet:
   #   context-path: /example/path
-  port: 8083
+  port: 4081
   tomcat:
     # allow | as a separator in URLs
     relaxed-query-chars: '|,{,},[,],^'
@@ -13,11 +13,11 @@ server:
 management:
   # Actuator endpoints: only /actuator/health exposed by default
   endpoints:
+    access:
+      default: unrestricted
     web:
       exposure:
         include: "health"  # or "info,health,prometheus,metrics" or "*" for all
-    access:
-      default: unrestricted
   endpoint:
     info:
       access: unrestricted
@@ -39,7 +39,7 @@ management:
 
 spring:
   # -------------------------------------------------------------------------------
-  # A. Spring AI — Model Context Protocol (MCP)
+  # A. Spring AI â€” Model Context Protocol (MCP)
   # -------------------------------------------------------------------------------
   ai:
     # Run e.g. `npx @modelcontextprotocol/inspector` and connect to http://localhost:8080/mcp/messages using Streamable HTTP
@@ -71,7 +71,7 @@ spring:
         name: FHIR MCP Server
         version: 1.0.0
         instructions: "This server provides access to a FHIR RESTful API. You can use it to query FHIR resources, perform operations, and retrieve data in a structured format."
-        enabled: true
+        enabled: false
         streamable-http:
           mcp-endpoint: /mcp/messages
 
@@ -98,14 +98,14 @@ spring:
     username: postgres
     password: password
     driverClassName: org.postgresql.Driver
-    # max-active: 15     # (ignored with HikariCP; use hikari.maximum-pool-size)
     hikari:
-      maximum-pool-size: 10
+      # maximum simultaneous connections to the db, it should be increased in production
+      maximum-pool-size: 15
 
   jpa:
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
         show_sql: false
         # Hibernate dialect is auto-detected except for H2/Postgres.
         # If using H2:     ca.uhn.fhir.jpa.model.dialect.HapiFhirH2Dialect
@@ -116,7 +116,7 @@ spring:
         hbm2ddl:
           auto: update
         jdbc:
-          batch_size: 20
+          batch_size: 50
         cache:
           use_query_cache: false
           use_second_level_cache: false
@@ -135,14 +135,14 @@ spring:
               type: local-filesystem
               root: target/lucenefiles
             lucene_version: lucene_current
-          # Elasticsearch backend (alternative) — see also hapi.fhir.elasticsearch section in docs
+          # Elasticsearch backend (alternative) â€” see also hapi.fhir.elasticsearch section in docs
           # backend:
           #   type: elasticsearch
           #   analysis:
           #     configurer: ca.uhn.fhir.jpa.search.HapiHSearchAnalysisConfigurers$HapiElasticAnalysisConfigurer
 
 # -------------------------------------------------------------------------------------
-# HAPI FHIR — grouped by domain
+# HAPI FHIR â€” grouped by domain
 # -------------------------------------------------------------------------------------
 hapi:
   fhir:
@@ -157,12 +157,13 @@ hapi:
     # custom_content_path: ./custom               # folder name must be 'custom'
     # app_content_path: ./configs/app            # served under /web/app
     # server_address: http://hapi.fhir.org/baseR4
-    # defer_indexing_for_codesystems_of_size: 101
+    # If a CodeSystem has fewer than this number, it's indexed immediately; otherwise, it's deferred to a background job:
+    defer_indexing_for_codesystems_of_size: 5000
 
     # -------------------------------------------------------------------------------
     # B. Implementation Guides (IG) & Package Install
     # -------------------------------------------------------------------------------
-    # ig_runtime_upload_enabled: false
+    ig_runtime_upload_enabled: false
     validate_resource_status_for_package_upload: false   # default true
     install_transitive_ig_dependencies: true
     implementationguides:
@@ -175,7 +176,7 @@ hapi:
       be-vaccination:
         packageUrl: https://ehealth.fgov.be/standards/fhir/vaccination/package.tgz
         name: hl7.fhir.be.vaccination
-        version: 1.1.1
+        version: 1.1.2
         reloadExisting: true
         installMode: STORE_AND_INSTALL
       be-allergy:
@@ -184,22 +185,43 @@ hapi:
         version: 1.2.0
         reloadExisting: true
         installMode: STORE_AND_INSTALL
-    #   swiss:
-    #     name: swiss.mednet.fhir
-    #     version: 0.8.0
-    #     reloadExisting: false
-    #     installMode: STORE_AND_INSTALL
-    #   ips_1_0_0:
-    #     packageUrl: https://costateixeira.github.io/smart-ips-pilgrimage-fulltest/package.tgz
-    #     name: smart.who.int.ips-pilgrimage-test
-    #     version: 0.1.0
-    #     installMode: STORE_AND_INSTALL
-    # additionalResourceFolders:
-    #   - example
-    #   - example2
-    # supported_resource_types:
-    #   - Patient
-    #   - Observation
+    #  swiss:
+    #    name: swiss.mednet.fhir
+    #    version: 0.8.0
+    #    reloadExisting: false
+    #    installMode: STORE_AND_INSTALL
+    #  ips_1_0_0:
+    #    packageUrl: https://costateixeira.github.io/smart-ips-pilgrimage-fulltest/package.tgz
+    #    name: smart.who.int.ips-pilgrimage-test
+    #    version: 0.1.0
+    #    installMode: STORE_AND_INSTALL
+    #additionalResourceFolders:
+    #  - example
+    #  - example2
+    #    supported_resource_types:
+    #      - NamingSystem
+    #      - CodeSystem
+    #      - ValueSet
+    #      - ConceptMap
+    #      - Library
+    #      - Measure
+    #      - Task
+    #      - Provenance
+    #      - DocumentReference
+    #      - Schedule
+    #      - Subscription
+    #      - Patient
+    #      - Immunization
+    #      - AllergyIntolerance
+    #      - Condition
+    #      - Procedure
+    #      - Medication
+    #      - Observation
+    #      - Practitioner
+    #      - PractitionerRole
+    #      - Organization
+    #      - Location
+    #      - Encounter
     allowed_bundle_types: COLLECTION,DOCUMENT,MESSAGE,TRANSACTION,TRANSACTIONRESPONSE,BATCH,BATCHRESPONSE,HISTORY,SEARCHSET
 
     # -------------------------------------------------------------------------------
@@ -245,7 +267,7 @@ hapi:
           # enable_expression_caching: true
       terminology:
         valueset_preexpansion_mode: REQUIRE               # USE_IF_PRESENT | REQUIRE | IGNORE
-        valueset_expansion_mode: PERFORM_NAIVE_EXPANSION  # AUTO | USE_EXPANSION_OPERATION | PERFORM_NAIVE_EXPANSION
+        valueset_expansion_mode: AUTO  # AUTO | USE_EXPANSION_OPERATION | PERFORM_NAIVE_EXPANSION
         valueset_membership_mode: USE_EXPANSION           # AUTO | USE_VALIDATE_CODE_OPERATION | USE_EXPANSION
         code_lookup_mode: USE_VALIDATE_CODE_OPERATION     # AUTO | USE_VALIDATE_CODE_OPERATION | USE_CODESYSTEM_URL
       data:
@@ -261,14 +283,14 @@ hapi:
     # -------------------------------------------------------------------------------
     # NOTE: Extended Lucene/Elasticsearch indexing is experimental.
     # See https://hapifhir.io/hapi-fhir/docs/server_jpa/elastic.html
-    advanced_lucene_indexing: false
-    search_index_full_text_enabled: false
-    # language_search_parameter_enabled: true
-    # upliftedRefchains_enabled: true
-    # index_storage_optimized: false
-    # enable_index_missing_fields: false
-    # enable_index_of_type: true
-    # enable_index_contained_resource: false
+    advanced_lucene_indexing: true
+    search_index_full_text_enabled: true
+    language_search_parameter_enabled: true
+    upliftedRefchains_enabled: true
+    index_storage_optimized: true
+    enable_index_missing_fields: true
+    enable_index_of_type: true
+    enable_index_contained_resource: true
     # store_resource_in_lucene_index_enabled: true
 
     # -------------------------------------------------------------------------------
@@ -288,14 +310,14 @@ hapi:
     auto_create_placeholder_reference_targets: false
     # mass_ingestion_mode_enabled: false
     # auto_version_reference_at_paths: Device.patient, Device.location, Device.parent, DeviceMetric.parent, DeviceMetric.source, Observation.device, Observation.subject
-    client_id_strategy: ALPHANUMERIC
+    client_id_strategy: ANY
     server_id_strategy: UUID
     # enforce_referential_integrity_on_delete: false
-    # enforce_referential_integrity_on_write: false
-    # etag_support_enabled: true
+    enforce_referential_integrity_on_write: true
+    etag_support_enabled: true
     # expunge_enabled: true
     # fhirpath_interceptor_enabled: false
-    # filter_search_enabled: true
+    filter_search_enabled: true
     # graphql_enabled: true
 
     # Thread pool configuration for maintenance operations
@@ -330,12 +352,12 @@ hapi:
     logical_urls:
       - http://terminology.hl7.org/*
       - https://terminology.hl7.org/*
-      - http://snomed.info/*
-      - https://snomed.info/*
+      #  - http://snomed.info/*
+      #  - https://snomed.info/*
       - http://unitsofmeasure.org/*
       - https://unitsofmeasure.org/*
-      - http://loinc.org/*
-      - https://loinc.org/*
+    #  - http://loinc.org/*
+    #  - https://loinc.org/*
 
     # -------------------------------------------------------------------------------
     # J. Partitioning & Multitenancy
@@ -389,15 +411,15 @@ hapi:
     # -------------------------------------------------------------------------------
     # N. Logging
     # -------------------------------------------------------------------------------
-    # logger:
-    #   error_format: "ERROR - ${requestVerb} ${requestUrl}"
-    #   format: >-
-    #     Path[${servletPath}] Source[${requestHeader.x-forwarded-for}]
-    #     Operation[${operationType} ${operationName} ${idOrResourceName}]
-    #     UA[${requestHeader.user-agent}] Params[${requestParameters}]
-    #     ResponseEncoding[${responseEncodingNoDefault}]
-    #   log_exceptions: true
-    #   name: fhirtest.access
+    logger:
+      error_format: "ERROR - ${requestVerb} ${requestUrl}"
+      format: >-
+        Path[${servletPath}] Source[${requestHeader.x-forwarded-for}]
+        Operation[${operationType} ${operationName} ${idOrResourceName}]
+        UA[${requestHeader.user-agent}] Params[${requestParameters}]
+        ResponseEncoding[${responseEncodingNoDefault}]
+      log_exceptions: true
+      name: fhirtest.access
 
     # -------------------------------------------------------------------------------
     # O. Storage / Pagination / Caching
@@ -420,11 +442,11 @@ hapi:
     # P. Remote Terminology Service (disabled by default)
     # -------------------------------------------------------------------------------
     remote_terminology_service:
-      all:
-        system: "*"
-        url: "https://tx.fhir.org/r4/"
+      #all:
+      #  system: "*"
+      #  url: "https://tx.fhir.org/r4/"
       snomed:
-        system: "http://snomed.info/sct"
+        system: "http://snomed.info/*"
         url: "https://apps-acc.health.belgium.be/ontoserver/fhir/"
       loinc:
         system: "http://loinc.org"
@@ -452,4 +474,4 @@ hapi:
     # -------------------------------------------------------------------------------
     # R. LastN (analytics)
     # -------------------------------------------------------------------------------
-    # lastn_enabled: tru
+    # lastn_enabled: true
