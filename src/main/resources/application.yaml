@@ -5,32 +5,33 @@ server:
   # Uncomment to serve FHIR under a non-default context path (e.g., /example/path/fhir)
   # servlet:
   #   context-path: /example/path
-  port: 8080
+  port: 4081
   tomcat:
     # allow | as a separator in URLs
-    relaxed-query-chars: "|"
+    relaxed-query-chars: '|,{,},[,],^'
 
 management:
   # Actuator endpoints: only /actuator/health exposed by default
   endpoints:
-    enabled-by-default: false
+    access:
+      default: unrestricted
     web:
       exposure:
         include: "health"  # or "info,health,prometheus,metrics" or "*" for all
   endpoint:
     info:
-      enabled: true
+      access: unrestricted
     metrics:
-      enabled: true
+      access: unrestricted
     health:
-      enabled: true
       probes:
         enabled: true
       group:
         liveness:
           include: [ "livenessState", "readinessState" ]
+      access: unrestricted
     prometheus:
-      enabled: true
+      access: unrestricted
   prometheus:
     metrics:
       export:
@@ -80,7 +81,7 @@ spring:
         name: FHIR MCP Server
         version: 1.0.0
         instructions: "This server provides access to a FHIR RESTful API. You can use it to query FHIR resources, perform operations, and retrieve data in a structured format."
-        enabled: true
+        enabled: false
         streamable-http:
           mcp-endpoint: /mcp/messages
 
@@ -104,13 +105,13 @@ spring:
 
   datasource:
     # url: "jdbc:h2:file:./target/database/h2"
-    url: jdbc:h2:mem:test_mem
-    username: sa
-    password: null
-    driver-class-name: org.h2.Driver
-    # max-active: 15     # (ignored with HikariCP; use hikari.maximum-pool-size)
+    url: jdbc:postgresql://localhost:5432/hapi
+    username: postgres
+    password: password
+    driverClassName: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
+      # maximum simultaneous connections to the db, it should be increased in production
+      maximum-pool-size: 15
 
   jpa:
     properties:
@@ -120,13 +121,13 @@ spring:
         # Hibernate dialect is auto-detected except for H2/Postgres.
         # If using H2:     ca.uhn.fhir.jpa.model.dialect.HapiFhirH2Dialect
         # If using Postgres: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
-        dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirH2Dialect
+        dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
 
         # --- Optional Hibernate DDL & tuning (commented out from source) ---
         hbm2ddl:
           auto: update
         jdbc:
-          batch_size: 20
+          batch_size: 50
         cache:
           use_query_cache: false
           use_second_level_cache: false
@@ -134,19 +135,19 @@ spring:
           use_minimal_puts: false
 
         # --- Hibernate Search (Lucene/Elasticsearch) ---
-        #search:
-        #  schema_management:
-        #    strategy: CREATE
-        #  enabled: true
+        search:
+          schema_management:
+            strategy: CREATE
+          enabled: true
           # Lucene backend (default example)
-          # backend:
-          #   type: lucene
-          #   analysis:
-          #     configurer: ca.uhn.fhir.jpa.search.HapiHSearchAnalysisConfigurers$HapiLuceneAnalysisConfigurer
-          #   directory:
-          #     type: local-filesystem
-          #     root: target/lucenefiles
-          #   lucene_version: lucene_current
+          backend:
+            type: lucene
+            analysis:
+              configurer: ca.uhn.fhir.jpa.search.HapiHSearchAnalysisConfigurers$HapiLuceneAnalysisConfigurer
+            directory:
+              type: local-filesystem
+              root: target/lucenefiles
+            lucene_version: lucene_current
           # Elasticsearch backend (alternative) — see also hapi.fhir.elasticsearch section in docs
 #          backend:
 #            layout:
@@ -184,15 +185,33 @@ hapi:
     # custom_content_path: ./custom               # folder name must be 'custom'
     # app_content_path: ./configs/app            # served under /web/app
     # server_address: http://hapi.fhir.org/baseR4
-    # defer_indexing_for_codesystems_of_size: 101
+    defer_indexing_for_codesystems_of_size: 5000
 
     # -------------------------------------------------------------------------------
     # B. Implementation Guides (IG) & Package Install
     # -------------------------------------------------------------------------------
     ig_runtime_upload_enabled: false
-    # validate_resource_status_for_package_upload: false   # default true
-    # install_transitive_ig_dependencies: true
-    # implementationguides:
+    validate_resource_status_for_package_upload: false   # default true
+    install_transitive_ig_dependencies: true
+    implementationguides:
+      be-core:
+        packageUrl: https://ehealth.fgov.be/standards/fhir/core/package.tgz
+        name: hl7.fhir.be.core
+        version: 2.1.2
+        reloadExisting: true
+        installMode: STORE_AND_INSTALL
+      be-vaccination:
+        packageUrl: https://ehealth.fgov.be/standards/fhir/vaccination/package.tgz
+        name: hl7.fhir.be.vaccination
+        version: 1.1.2
+        reloadExisting: true
+        installMode: STORE_AND_INSTALL
+      be-allergy:
+        packageUrl: https://ehealth.fgov.be/standards/fhir/allergy/package.tgz
+        name: hl7.fhir.be.allergy
+        version: 1.2.0
+        reloadExisting: true
+        installMode: STORE_AND_INSTALL
     #   swiss:
     #     name: swiss.mednet.fhir
     #     version: 0.8.0
@@ -209,7 +228,7 @@ hapi:
     # supported_resource_types:
     #   - Patient
     #   - Observation
-    # allowed_bundle_types: COLLECTION,DOCUMENT,MESSAGE,TRANSACTION,TRANSACTIONRESPONSE,BATCH,BATCHRESPONSE,HISTORY,SEARCHSET
+    allowed_bundle_types: COLLECTION,DOCUMENT,MESSAGE,TRANSACTION,TRANSACTIONRESPONSE,BATCH,BATCHRESPONSE,HISTORY,SEARCHSET
 
     # -------------------------------------------------------------------------------
     # C. Clinical Reasoning / CQL / Care Gaps / CDS Hooks
@@ -270,14 +289,14 @@ hapi:
     # -------------------------------------------------------------------------------
     # NOTE: Extended Lucene/Elasticsearch indexing is experimental.
     # See https://hapifhir.io/hapi-fhir/docs/server_jpa/elastic.html
-    # advanced_lucene_indexing: true
-    # search_index_full_text_enabled: true
-    # language_search_parameter_enabled: true
-    # upliftedRefchains_enabled: true
-    # index_storage_optimized: false
-    # enable_index_missing_fields: false
-    # enable_index_of_type: true
-    # enable_index_contained_resource: false
+    advanced_lucene_indexing: true
+    search_index_full_text_enabled: true
+    language_search_parameter_enabled: true
+    upliftedRefchains_enabled: true
+    index_storage_optimized: true
+    enable_index_missing_fields: true
+    enable_index_of_type: true
+    enable_index_contained_resource: true
     # store_resource_in_lucene_index_enabled: true
 
     # -------------------------------------------------------------------------------
@@ -296,22 +315,22 @@ hapi:
     # -------------------------------------------------------------------------------
     # F. Write / Delete / Integrity
     # -------------------------------------------------------------------------------
-    # allow_cascading_deletes: true
-    # allow_contains_searches: true
-    # allow_external_references: true
-    # allow_multiple_delete: true
-    # allow_override_default_search_params: true
-    # auto_create_placeholder_reference_targets: false
+    allow_cascading_deletes: true
+    allow_contains_searches: true
+    allow_external_references: true
+    allow_multiple_delete: true
+    allow_override_default_search_params: true
+    auto_create_placeholder_reference_targets: false
     # mass_ingestion_mode_enabled: false
     # auto_version_reference_at_paths: Device.patient, Device.location, Device.parent, DeviceMetric.parent, DeviceMetric.source, Observation.device, Observation.subject
-    # client_id_strategy: ALPHANUMERIC
-    # server_id_strategy: SEQUENTIAL_NUMERIC
+    client_id_strategy: ANY
+    server_id_strategy: UUID
     # enforce_referential_integrity_on_delete: false
-    # enforce_referential_integrity_on_write: false
-    # etag_support_enabled: true
+    enforce_referential_integrity_on_write: true
+    etag_support_enabled: true
     # expunge_enabled: true
     # fhirpath_interceptor_enabled: false
-    # filter_search_enabled: true
+    filter_search_enabled: true
     # graphql_enabled: true
 
     # Thread pool configuration for maintenance operations
@@ -324,34 +343,34 @@ hapi:
     # G. Narrative & Validation
     # -------------------------------------------------------------------------------
     narrative_enabled: false
-    # validation:
-    #   requests_enabled: true
-    #   responses_enabled: true
+    validation:
+      requests_enabled: true
+      responses_enabled: false
 
     # -------------------------------------------------------------------------------
     # H. MDM (Master Data Management)
     # -------------------------------------------------------------------------------
     mdm_enabled: false
     mdm_rules_json_location: "mdm-rules.json"
-    # userRequestRetryVersionConflictsInterceptorEnabled: false
+    userRequestRetryVersionConflictsInterceptorEnabled: true
 
     # -------------------------------------------------------------------------------
     # I. Terminology / ValueSet Expansion
     # -------------------------------------------------------------------------------
-    # pre_expand_value_sets: true
-    # enable_task_pre_expand_value_sets: true
-    # pre_expand_value_sets_default_count: 1000
-    # pre_expand_value_sets_max_count: 1000
-    # maximum_expansion_size: 1000
+    pre_expand_value_sets: true
+    enable_task_pre_expand_value_sets: true
+    pre_expand_value_sets_default_count: 10000
+    pre_expand_value_sets_max_count: 100000
+    maximum_expansion_size: 100000
     logical_urls:
       - http://terminology.hl7.org/*
       - https://terminology.hl7.org/*
-      - http://snomed.info/*
-      - https://snomed.info/*
+      # - http://snomed.info/*
+      # - https://snomed.info/*
       - http://unitsofmeasure.org/*
       - https://unitsofmeasure.org/*
-      - http://loinc.org/*
-      - https://loinc.org/*
+      # - http://loinc.org/*
+      # - https://loinc.org/*
 
     # -------------------------------------------------------------------------------
     # J. Partitioning & Multitenancy
@@ -405,23 +424,23 @@ hapi:
     # -------------------------------------------------------------------------------
     # N. Logging
     # -------------------------------------------------------------------------------
-    # logger:
-    #   error_format: "ERROR - ${requestVerb} ${requestUrl}"
-    #   format: >-
-    #     Path[${servletPath}] Source[${requestHeader.x-forwarded-for}]
-    #     Operation[${operationType} ${operationName} ${idOrResourceName}]
-    #     UA[${requestHeader.user-agent}] Params[${requestParameters}]
-    #     ResponseEncoding[${responseEncodingNoDefault}]
-    #   log_exceptions: true
-    #   name: fhirtest.access
+    logger:
+      error_format: "ERROR - ${requestVerb} ${requestUrl}"
+      format: >-
+        Path[${servletPath}] Source[${requestHeader.x-forwarded-for}]
+        Operation[${operationType} ${operationName} ${idOrResourceName}]
+        UA[${requestHeader.user-agent}] Params[${requestParameters}]
+        ResponseEncoding[${responseEncodingNoDefault}]
+      log_exceptions: true
+      name: fhirtest.access
 
     # -------------------------------------------------------------------------------
     # O. Storage / Pagination / Caching
     # -------------------------------------------------------------------------------
     # max_binary_size: 104857600
-    # max_page_size: 200
-    # retain_cached_searches_mins: 60
-    # reuse_cached_search_results_millis: 60000
+    max_page_size: 200
+    retain_cached_searches_mins: 60
+    reuse_cached_search_results_millis: 60000
     #   validation:
     #     requests_enabled: true
     #     responses_enabled: true
@@ -435,16 +454,16 @@ hapi:
     # -------------------------------------------------------------------------------
     # P. Remote Terminology Service (disabled by default)
     # -------------------------------------------------------------------------------
-    # remote_terminology_service:
-    #   all:
-    #     system: "*"
-    #     url: "https://tx.fhir.org/r4/"
-    #   snomed:
-    #     system: "http://snomed.info/sct"
-    #     url: "https://tx.fhir.org/r4/"
-    #   loinc:
-    #     system: "http://loinc.org"
-    #     url: "https://hapi.fhir.org/baseR4/"
+    remote_terminology_service:
+      #all:
+      #  system: "*"
+      #  url: "https://tx.fhir.org/r4/"
+      snomed:
+        system: "http://snomed.info/*"
+        url: "https://apps-acc.health.belgium.be/ontoserver/fhir/"
+      loinc:
+        system: "http://loinc.org"
+        url: "https://hapi.fhir.org/baseR4/"
 
     # -------------------------------------------------------------------------------
     # Q. Subscriptions (disabled by default)
@@ -476,6 +495,6 @@ hapi:
     tester:
       home:
         name: Local Tester
-        server_address: 'http://localhost:8080/fhir'
+        server_address: 'http://localhost:4081/fhir'
         refuse_to_fetch_third_party_urls: false
         fhir_version: R4
